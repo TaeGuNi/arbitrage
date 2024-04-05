@@ -1,0 +1,9 @@
+version: "3.9"
+services:
+  homebridge:
+    image: arbitrage:v0.0.2
+    restart: always
+    container_name: arbitrage
+    hostname: arbitrage
+    volumes:
+      - ./.env:/arbitrage/.env

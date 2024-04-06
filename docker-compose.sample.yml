@@ -1,7 +1,10 @@
 version: "3.9"
 services:
-  homebridge:
-    image: arbitrage:v0.0.2
+  arbitrage:
+    image: arbitrage:v1.0.1
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: always
     container_name: arbitrage
     hostname: arbitrage

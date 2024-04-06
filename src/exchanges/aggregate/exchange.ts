@@ -177,8 +177,10 @@ export default class Exchange {
           qty: Number(ob.qty),
         };
 
-        // this.check_order(ob.target_currency);
-        this.maker_strategy(ob.target_currency);
+        if (ob.type === "BID") {
+          // this.check_order(ob.target_currency);
+          this.maker_strategy(ob.target_currency);
+        }
       }
     } catch (error) {
       logger.error("%s", error);
@@ -481,7 +483,7 @@ export default class Exchange {
                   bid_price: coinone_bid_price,
                   bid_qty: bid_qty,
                 };
-                this.watch_order(symbol);
+                this.delay_watch_order(symbol);
               } else {
                 this.maker_orders[s] = {
                   id: undefined,
@@ -587,7 +589,7 @@ export default class Exchange {
                   bid_qty: 0,
                 };
               } else {
-                this.watch_order(symbol);
+                this.delay_watch_order(symbol);
               }
               break;
             case OrderStatus.FILLED:
@@ -681,19 +683,26 @@ export default class Exchange {
                   };
                 }
               } else {
-                this.watch_order(symbol);
+                this.delay_watch_order(symbol);
               }
               break;
             default:
-              this.watch_order(symbol);
+              this.delay_watch_order(symbol);
               break;
           }
         } catch (error) {
           logger.error(error);
-          this.watch_order(symbol);
+          this.delay_watch_order(symbol);
         }
       }
       resolve();
     });
+  }
+
+  delay_watch_order(symbol: Symbol): void {
+    const timeout = setTimeout(() => {
+      this.watch_order(symbol);
+      clearTimeout(timeout);
+    }, 500);
   }
 }

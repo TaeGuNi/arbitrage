@@ -594,6 +594,15 @@ export default class Exchange {
             case OrderStatus.FILLED:
               await this.upbit_order(symbol);
               break;
+            case OrderStatus.CANCELED:
+              this.maker_orders[s] = {
+                id: undefined,
+                coinone_order_id: undefined,
+                upbit_order_id: undefined,
+                bid_price: 0,
+                bid_qty: 0,
+              };
+              break;
             case OrderStatus.PARTIALLY_FILLED:
               if (
                 Number(order.response.order.price) *
@@ -602,27 +611,36 @@ export default class Exchange {
                 Number(order.response.order.price) <
                   this.aggregate_orderbook.coinone[s].bid.price
               ) {
-                const delete_order: Order =
-                  await this.coinone_rest_api_client.delete_order(
-                    symbol,
-                    this.maker_orders[s].coinone_order_id,
-                    this.maker_orders[s].id
+                try {
+                  const delete_order: Order =
+                    await this.coinone_rest_api_client.delete_order(
+                      symbol,
+                      this.maker_orders[s].coinone_order_id,
+                      this.maker_orders[s].id
+                    );
+                  logger.debug(
+                    "DELETE Order ==============================================="
                   );
-                logger.debug(
-                  "DELETE Order ==============================================="
-                );
-                logger.debug(
-                  `DELETE Order:          ${delete_order.response.result}`
-                );
-                if (delete_order.response.result === "success") {
-                  const qty: number = Number(order.response.order.traded_qty);
-                  await this.upbit_order(symbol, qty);
-                } else {
-                  this.delay_watch_coinone_order(symbol);
+                  logger.debug(
+                    `DELETE Order:          ${delete_order.response.result}`
+                  );
+                  if (delete_order.response.result === "success") {
+                    const qty: number = Number(order.response.order.traded_qty);
+                    await this.upbit_order(symbol, qty);
+                  } else {
+                    this.delay_watch_coinone_order(symbol);
+                  }
+                } catch (error) {
+                  logger.debug("Failed Delete order");
+                  logger.error(error);
                 }
               } else {
                 this.delay_watch_coinone_order(symbol);
               }
+              break;
+            case OrderStatus.PARTIALLY_CANCELED:
+              const qty: number = Number(order.response.order.traded_qty);
+              await this.upbit_order(symbol, qty);
               break;
             default:
               this.delay_watch_coinone_order(symbol);

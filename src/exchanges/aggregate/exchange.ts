@@ -483,7 +483,7 @@ export default class Exchange {
                   bid_price: coinone_bid_price,
                   bid_qty: bid_qty,
                 };
-                this.delay_watch_order(symbol);
+                this.delay_watch_coinone_order(symbol);
               } else {
                 this.maker_orders[s] = {
                   id: undefined,
@@ -510,9 +510,8 @@ export default class Exchange {
     });
   }
 
-  async watch_order(symbol: Symbol): Promise<void> {
+  async watch_coinone_order(symbol: Symbol): Promise<void> {
     return new Promise(async (resolve, reject) => {
-      const interval = setInterval(() => {}, 500);
       const s: symbol_type = symbol_to_string(symbol);
       if (
         s !== "krw" &&
@@ -589,43 +588,11 @@ export default class Exchange {
                   bid_qty: 0,
                 };
               } else {
-                this.delay_watch_order(symbol);
+                this.delay_watch_coinone_order(symbol);
               }
               break;
             case OrderStatus.FILLED:
-              const ask_price: number =
-                Math.ceil(
-                  (Number(order.response.order.price) * 1.0026) /
-                    asking_price_unit
-                ) * asking_price_unit;
-
-              logger.debug(`ask_price              ${symbol} ${ask_price}`);
-              const asking_order: Order =
-                await this.upbit_rest_api_client.make_order(
-                  "ask",
-                  this.maker_orders[s].id,
-                  symbol,
-                  ask_price,
-                  this.maker_orders[s].bid_qty
-                );
-              logger.debug(
-                "ASKING Order ==============================================="
-              );
-              logger.debug(
-                `upbit order id:        ${asking_order.response.uuid}`
-              );
-              logger.debug(
-                `ASKING Order           ${s}: ${ask_price}` +
-                  ` * ${this.maker_orders[s].bid_qty}` +
-                  ` = ${ask_price * this.maker_orders[s].bid_qty}`
-              );
-              this.maker_orders[s] = {
-                id: undefined,
-                coinone_order_id: undefined,
-                upbit_order_id: undefined,
-                bid_price: 0,
-                bid_qty: 0,
-              };
+              await this.upbit_order(symbol);
               break;
             case OrderStatus.PARTIALLY_FILLED:
               if (
@@ -648,61 +615,94 @@ export default class Exchange {
                   `DELETE Order:          ${delete_order.response.result}`
                 );
                 if (delete_order.response.result === "success") {
-                  const ask_price: number =
-                    Math.ceil(
-                      (Number(order.response.order.price) * 1.0026) /
-                        asking_price_unit
-                    ) * asking_price_unit;
-
-                  logger.debug(`ask_price              ${symbol} ${ask_price}`);
-                  const asking_order: Order =
-                    await this.upbit_rest_api_client.make_order(
-                      "ask",
-                      this.maker_orders[s].id,
-                      symbol,
-                      ask_price,
-                      Number(order.response.order.traded_qty)
-                    );
-                  logger.debug(
-                    "ASKING Order ==============================================="
-                  );
-                  logger.debug(
-                    `upbit order id:        ${asking_order.response.uuid}`
-                  );
-                  logger.debug(
-                    `ASKING Order           ${s}: ${ask_price}` +
-                      ` * ${this.maker_orders[s].bid_qty}` +
-                      ` = ${ask_price * this.maker_orders[s].bid_qty}`
-                  );
-                  this.maker_orders[s] = {
-                    id: undefined,
-                    coinone_order_id: undefined,
-                    upbit_order_id: undefined,
-                    bid_price: 0,
-                    bid_qty: 0,
-                  };
+                  const qty: number = Number(order.response.order.traded_qty);
+                  await this.upbit_order(symbol, qty);
+                } else {
+                  this.delay_watch_coinone_order(symbol);
                 }
               } else {
-                this.delay_watch_order(symbol);
+                this.delay_watch_coinone_order(symbol);
               }
               break;
             default:
-              this.delay_watch_order(symbol);
+              this.delay_watch_coinone_order(symbol);
               break;
           }
         } catch (error) {
           logger.error(error);
-          this.delay_watch_order(symbol);
+          this.delay_watch_coinone_order(symbol);
         }
       }
       resolve();
     });
   }
 
-  delay_watch_order(symbol: Symbol): void {
+  delay_watch_coinone_order(symbol: Symbol): void {
     const timeout = setTimeout(() => {
-      this.watch_order(symbol);
+      this.watch_coinone_order(symbol);
       clearTimeout(timeout);
     }, 500);
+  }
+
+  async upbit_order(symbol: Symbol, qty?: number | undefined): Promise<void> {
+    return new Promise(async (resolve, reject) => {
+      const s: symbol_type = symbol_to_string(symbol);
+
+      const asking_price_unit: number =
+        get_asking_price_unit(symbol) < 1 ? 10 : get_asking_price_unit(symbol);
+
+      if (
+        s !== "krw" &&
+        (this.maker_orders[s].coinone_order_id !== undefined ||
+          this.maker_orders[s].id !== undefined)
+      ) {
+        let ask_price: number =
+          Math.ceil(
+            (Number(this.maker_orders[s].bid_price) * 1.0026) /
+              asking_price_unit
+          ) * asking_price_unit;
+
+        if (
+          ask_price < this.aggregate_orderbook.upbit[s].bid.price &&
+          this.aggregate_orderbook.upbit[s].bid.date > Date.now() - 500
+        ) {
+          ask_price = this.aggregate_orderbook.upbit[s].bid.price;
+        }
+
+        logger.debug(`ask_price              ${symbol} ${ask_price}`);
+        try {
+          const asking_order: Order =
+            await this.upbit_rest_api_client.make_order(
+              "ask",
+              this.maker_orders[s].id,
+              symbol,
+              ask_price,
+              qty === undefined ? this.maker_orders[s].bid_qty : qty
+            );
+          logger.debug(
+            "ASKING Order ==============================================="
+          );
+          logger.debug(`upbit order id:        ${asking_order.response.uuid}`);
+          logger.debug(
+            `ASKING Order           ${s}: ${ask_price}` +
+              ` * ${this.maker_orders[s].bid_qty}` +
+              ` = ${ask_price * this.maker_orders[s].bid_qty}`
+          );
+
+          this.maker_orders[s] = {
+            id: undefined,
+            coinone_order_id: undefined,
+            upbit_order_id: undefined,
+            bid_price: 0,
+            bid_qty: 0,
+          };
+        } catch (error) {
+          logger.debug("Error from Upbit");
+          logger.error(error);
+          reject(error);
+        }
+      }
+      resolve();
+    });
   }
 }

@@ -105,109 +105,117 @@ export default class Exchange {
         const upbit: AggregateSide = this.aggregate_orderbook.upbit[s];
 
         if (
-          coinone.ask.price <= 0 ||
-          coinone.bid.price <= 0 ||
-          upbit.ask.price <= 0 ||
-          upbit.bid.price <= 0 ||
-          coinone.ask.date <= Date.now() - 500 ||
-          coinone.bid.date <= Date.now() - 500 ||
-          upbit.ask.date <= Date.now() - 500 ||
-          upbit.bid.date <= Date.now() - 500 ||
-          this.maker_orders[s].id !== undefined ||
-          this.maker_orders[s].coinone_order_id !== undefined
+          coinone.ask.price > 0 &&
+          coinone.bid.price > 0 &&
+          upbit.ask.price > 0 &&
+          upbit.bid.price > 0 &&
+          coinone.ask.date > Date.now() - 500 &&
+          coinone.bid.date > Date.now() - 500 &&
+          upbit.ask.date > Date.now() - 500 &&
+          upbit.bid.date > Date.now() - 500 &&
+          this.maker_orders[s].id === undefined &&
+          this.maker_orders[s].coinone_order_id === undefined
         ) {
-          return;
-        }
+          const coinone_ask_price: number = coinone.ask.price;
+          logger.debug(
+            `coinone_ask_price:     ${green}${symbol} ${yellow}${coinone_ask_price}${reset}`
+          );
+          const coinone_bid_price: number = coinone.bid.price; //- get_asking_price_unit(symbol);
+          logger.debug(
+            `coinone_bid_price:     ${green}${symbol} ${yellow}${coinone_bid_price}${reset}`
+          );
+          const upbit_bid_price: number = upbit.bid.price; //- get_asking_price_unit(symbol);
+          logger.debug(
+            `upbit_bid_price:       ${green}${symbol} ${yellow}${upbit_bid_price}${reset}`
+          );
 
-        const coinone_ask_price: number = coinone.ask.price;
-        logger.debug(
-          `coinone_ask_price:     ${green}${symbol} ${yellow}${coinone_ask_price}${reset}`
-        );
-        const coinone_bid_price: number = coinone.bid.price; //- get_asking_price_unit(symbol);
-        logger.debug(
-          `coinone_bid_price:     ${green}${symbol} ${yellow}${coinone_bid_price}${reset}`
-        );
-        const upbit_bid_price: number = upbit.bid.price; //- get_asking_price_unit(symbol);
-        logger.debug(
-          `upbit_bid_price:       ${green}${symbol} ${yellow}${upbit_bid_price}${reset}`
-        );
+          await this.update_accounts();
 
-        await this.update_accounts();
-
-        Math.floor(
-          (this.coinone_accounts.krw.available / coinone_ask_price) * 100000
-        ) / 100000;
-
-        let bid_qty: number =
           Math.floor(
             (this.coinone_accounts.krw.available / coinone_ask_price) * 100000
           ) / 100000;
-        let qty: number =
-          coinone.ask.qty > upbit.bid.qty ? upbit.bid.qty : coinone.ask.qty;
 
-        let coinone_order_price: number = 0;
+          let bid_qty: number =
+            Math.floor(
+              (this.coinone_accounts.krw.available / coinone_ask_price) * 100000
+            ) / 100000;
+          const available_qty: number =
+            coinone.ask.qty > upbit.bid.qty ? upbit.bid.qty : coinone.ask.qty;
 
-        bid_qty = bid_qty < qty ? bid_qty : qty;
+          let coinone_order_price: number = 0;
 
-        let profit: number =
-          upbit_bid_price * bid_qty * (1 - this.upbit_fee) -
-          coinone_ask_price * bid_qty * (1 + this.coinone_fee);
-        if (
-          profit > 0 &&
-          upbit_bid_price > (coinone_bid_price + profit) * 0.0001
-        ) {
-          coinone_order_price = coinone_ask_price;
-          logger.debug(
-            `ask profit:            ${green}${symbol} ${red}${profit}${reset}`
-          );
-        } else {
-          coinone_order_price = coinone_bid_price;
-          bid_qty =
-            Math.ceil((this.minimum_amount / coinone_bid_price) * 100000) /
-            100000;
-          profit =
+          bid_qty = bid_qty < available_qty ? bid_qty : available_qty;
+
+          let profit: number =
             upbit_bid_price * bid_qty * (1 - this.upbit_fee) -
-            coinone_bid_price * bid_qty * (1 + this.coinone_fee);
-          logger.debug(
-            `bid profit:            ${green}${symbol} ${red}${profit}${reset}`
-          );
-        }
+            coinone_ask_price * bid_qty * (1 + this.coinone_fee);
+          if (
+            profit > 0 &&
+            upbit_bid_price > (coinone_bid_price + profit) * 0.0001
+          ) {
+            coinone_order_price = coinone_ask_price;
+            logger.debug(
+              `ask profit:            ${green}${symbol} ${red}${profit}${reset}`
+            );
+          } else {
+            coinone_order_price = coinone_bid_price;
+            bid_qty =
+              Math.ceil((this.minimum_amount / coinone_bid_price) * 100000) /
+              100000;
+            profit =
+              upbit_bid_price * bid_qty * (1 - this.upbit_fee) -
+              coinone_bid_price * bid_qty * (1 + this.coinone_fee);
+            logger.debug(
+              `bid profit:            ${green}${symbol} ${red}${profit}${reset}`
+            );
+          }
 
-        if (
-          coinone_order_price > 0 &&
-          profit > 0 &&
-          upbit_bid_price > (coinone_bid_price + profit) * 0.0001
-        ) {
-          const order_id: string = uuidv4();
-          this.maker_orders[s].id = order_id;
-          try {
-            if (
-              this.coinone_accounts.krw.available > this.minimum_amount &&
-              this.upbit_accounts[s].available >= bid_qty
-            ) {
-              logger.debug(
-                `NEW Order ${s}: ${coinone_order_price} * ${bid_qty} = ${
-                  coinone_order_price * bid_qty
-                }`
-              );
+          if (
+            coinone_order_price > 0 &&
+            profit > 0 &&
+            upbit_bid_price >= (coinone_bid_price + profit) * 0.0001
+          ) {
+            const order_id: string = uuidv4();
+            this.maker_orders[s].id = order_id;
+            try {
+              if (
+                this.coinone_accounts.krw.available > this.minimum_amount &&
+                this.upbit_accounts[s].available >= bid_qty
+              ) {
+                logger.debug(
+                  `NEW Order ${s}: ${coinone_order_price} * ${bid_qty} = ${
+                    coinone_order_price * bid_qty
+                  }`
+                );
 
-              const make_order = await this.coinone_rest_api_client.make_order(
-                "bid",
-                order_id,
-                symbol,
-                coinone_order_price,
-                bid_qty
-              );
+                const make_order =
+                  await this.coinone_rest_api_client.make_order(
+                    "bid",
+                    order_id,
+                    symbol,
+                    coinone_order_price,
+                    bid_qty
+                  );
 
-              this.maker_orders[s] = {
-                id: order_id,
-                coinone_order_id: make_order.order_id,
-                upbit_order_id: undefined,
-                bid_price: coinone_order_price,
-                bid_qty: bid_qty,
-              };
-              this.delay_watch_coinone_order(symbol);
-            } else {
+                this.maker_orders[s] = {
+                  id: order_id,
+                  coinone_order_id: make_order.order_id,
+                  upbit_order_id: undefined,
+                  bid_price: coinone_order_price,
+                  bid_qty: bid_qty,
+                };
+                this.delay_watch_coinone_order(symbol);
+              } else {
+                this.maker_orders[s] = {
+                  id: undefined,
+                  coinone_order_id: undefined,
+                  upbit_order_id: undefined,
+                  bid_price: 0,
+                  bid_qty: 0,
+                };
+              }
+            } catch (error) {
+              logger.error(error);
               this.maker_orders[s] = {
                 id: undefined,
                 coinone_order_id: undefined,
@@ -216,15 +224,6 @@ export default class Exchange {
                 bid_qty: 0,
               };
             }
-          } catch (error) {
-            logger.error(error);
-            this.maker_orders[s] = {
-              id: undefined,
-              coinone_order_id: undefined,
-              upbit_order_id: undefined,
-              bid_price: 0,
-              bid_qty: 0,
-            };
           }
         }
       }

@@ -244,6 +244,8 @@ export default class Exchange {
                 bid_qty: 0,
               };
             }
+          } else {
+            this.maker_orders[s].id = undefined;
           }
         }
       }

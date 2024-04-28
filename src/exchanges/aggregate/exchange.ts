@@ -108,7 +108,7 @@ export default class Exchange {
           this.maker_strategy(enum_symbol);
         }
       });
-    }, 500);
+    }, 200);
   }
 
   async update_accounts(): Promise<void> {
@@ -168,14 +168,14 @@ export default class Exchange {
           let profit: number =
             upbit_bid_price * bid_qty * (1 - this.upbit_fee) -
             coinone_ask_price * bid_qty * (1 + this.coinone_fee);
+          logger.debug(
+            `ask profit:            ${green}${symbol} ${red}${profit}${reset}`
+          );
           if (
             profit > 0 &&
             upbit_bid_price > (coinone_bid_price + profit) * 0.0001
           ) {
             coinone_order_price = coinone_ask_price;
-            logger.debug(
-              `ask profit:            ${green}${symbol} ${red}${profit}${reset}`
-            );
           } else {
             coinone_order_price = coinone_bid_price;
             bid_qty =

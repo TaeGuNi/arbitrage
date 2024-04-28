@@ -29,38 +29,6 @@ COINONE_FEE=0.002
 
 # 업비트 수수료
 UPBIT_FEE=0.0005
-
-# ADA
-TARGET_ADA_PROFIT_RATE=0.2      # 차익 거래 최소 수익률
-TARGET_ADA_PROFIT=500           # 거래당 절대 최소 차익 금액
-
-# ALGO
-TARGET_ALGO_PROFIT_RATE=0.2     # 차익 거래 최소 수익률
-TARGET_ALGO_PROFIT=500          # 거래당 절대 최소 차익 금액
-
-# ATOM
-TARGET_ATOM_PROFIT_RATE=0.2     # 차익 거래 최소 수익률
-TARGET_ATOM_PROFIT=500          # 거래당 절대 최소 차익 금액
-
-# BTC
-TARGET_BTC_PROFIT_RATE=0.5      # 차익 거래 최소 수익률
-TARGET_BTC_PROFIT=50000         # 거래당 절대 최소 차익 금액
-
-# DOGE
-TARGET_DOGE_PROFIT_RATE=0.2     # 차익 거래 최소 수익률
-TARGET_DOGE_PROFIT=500          # 거래당 절대 최소 차익 금액
-
-# ETH
-TARGET_ETH_PROFIT_RATE=0.5      # 차익 거래 최소 수익률
-TARGET_ETH_PROFIT=5000          # 거래당 절대 최소 차익 금액
-
-# MATIC
-TARGET_MATIC_PROFIT_RATE=0.2    # 차익 거래 최소 수익률
-TARGET_MATIC_PROFIT=500         # 거래당 절대 최소 차익 금액
-
-# SOL
-TARGET_SOL_PROFIT_RATE=0.3      # 차익 거래 최소 수익률
-TARGET_SOL_PROFIT=500           # 거래당 절대 최소 차익 금액
 ```
 
 ## 실행방법

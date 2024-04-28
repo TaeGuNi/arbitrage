@@ -9,7 +9,12 @@ import AggregateOrderbook, {
   default_aggregate_orderbook,
 } from "./dto/aggregate_orderbook";
 import AggregateSide from "./dto/aggregate_side";
-import { get_asking_price_unit, symbol_to_string, symbol_type } from "../utils";
+import {
+  get_asking_price_unit,
+  isSupportSymbol,
+  symbol_to_string,
+  symbol_type,
+} from "../utils";
 import MakerOrders, { default_maker_orders } from "./dto/maker_orders";
 import { OrderStatus } from "../coinone/dto/order_status";
 import { reset, red, green, yellow, logger } from "../../logger";
@@ -43,6 +48,8 @@ export default class Exchange {
     default_aggregate_orderbook
   );
 
+  private readonly symbols: string[];
+
   constructor() {
     this.minimum_amount =
       process.env.MINIMUM_AMOUNT === undefined
@@ -58,6 +65,13 @@ export default class Exchange {
       process.env.UPBIT_FEE === undefined
         ? 0.0005
         : Number(process.env.UPBIT_FEE);
+
+    const trade_symbol: string | undefined = process.env.TRADE_SYMBOL;
+    if (trade_symbol !== undefined) {
+      this.symbols = trade_symbol.split(",");
+    } else {
+      this.symbols = [];
+    }
 
     this.init();
   }
@@ -77,10 +91,6 @@ export default class Exchange {
           price: Number(ob.price),
           qty: Number(ob.qty),
         };
-
-        if (ob.type === "BID") {
-          this.maker_strategy(ob.target_currency);
-        }
       }
     } catch (error) {
       logger.error("%s", error);
@@ -90,6 +100,15 @@ export default class Exchange {
 
   async init(): Promise<void> {
     Exchange._STATE = "READY";
+
+    setInterval(() => {
+      this.symbols.forEach((symbol: string) => {
+        if (isSupportSymbol(symbol)) {
+          const enum_symbol: Symbol = Symbol[symbol as keyof typeof Symbol];
+          this.maker_strategy(enum_symbol);
+        }
+      });
+    }, 500);
   }
 
   async update_accounts(): Promise<void> {

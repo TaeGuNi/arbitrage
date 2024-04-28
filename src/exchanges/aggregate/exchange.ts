@@ -135,6 +135,9 @@ export default class Exchange {
           this.maker_orders[s].id === undefined &&
           this.maker_orders[s].coinone_order_id === undefined
         ) {
+          const order_id: string = uuidv4();
+          this.maker_orders[s].id = order_id;
+
           const coinone_ask_price: number = coinone.ask.price;
           logger.debug(
             `coinone_ask_price:     ${green}${symbol} ${yellow}${coinone_ask_price}${reset}`
@@ -194,8 +197,6 @@ export default class Exchange {
             profit > 0 &&
             upbit_bid_price >= (coinone_bid_price + profit) * 0.0001
           ) {
-            const order_id: string = uuidv4();
-            this.maker_orders[s].id = order_id;
             try {
               if (
                 this.coinone_accounts.krw.available > this.minimum_amount &&
@@ -263,11 +264,9 @@ export default class Exchange {
         );
         const coinone: AggregateSide = this.aggregate_orderbook.coinone[s];
         const upbit: AggregateSide = this.aggregate_orderbook.upbit[s];
-        const coinone_bid = coinone.bid;
-        const coinone_bid_price: number = coinone_bid.price; //- get_asking_price_unit(symbol);
+        const coinone_bid_price: number = coinone.bid.price; //- get_asking_price_unit(symbol);
         logger.debug(`coinone_bid_price:     ${symbol} ${coinone_bid_price}`);
-        const upbit_bid = upbit.bid;
-        const upbit_bid_price: number = upbit_bid.price; //- get_asking_price_unit(symbol);
+        const upbit_bid_price: number = upbit.bid.price; //- get_asking_price_unit(symbol);
 
         try {
           const order: Order = await this.coinone_rest_api_client.get_order(
@@ -297,10 +296,6 @@ export default class Exchange {
           logger.debug(
             `coinone ${symbol} order status:  ${coinone_order_status}`
           );
-          const asking_price_unit: number =
-            get_asking_price_unit(symbol) < 1
-              ? 10
-              : get_asking_price_unit(symbol);
           switch (coinone_order_status) {
             case OrderStatus.LIVE:
               if (
@@ -320,13 +315,17 @@ export default class Exchange {
                 logger.debug(
                   `DELETE Order:          ${delete_order.response.result}`
                 );
-                this.maker_orders[s] = {
-                  id: undefined,
-                  coinone_order_id: undefined,
-                  upbit_order_id: undefined,
-                  bid_price: 0,
-                  bid_qty: 0,
-                };
+                if (delete_order.response.result === "success") {
+                  this.maker_orders[s] = {
+                    id: undefined,
+                    coinone_order_id: undefined,
+                    upbit_order_id: undefined,
+                    bid_price: 0,
+                    bid_qty: 0,
+                  };
+                } else {
+                  this.delay_watch_coinone_order(symbol);
+                }
               } else {
                 this.delay_watch_coinone_order(symbol);
               }
@@ -396,10 +395,10 @@ export default class Exchange {
   }
 
   delay_watch_coinone_order(symbol: Symbol): void {
-    const timeout = setTimeout(() => {
+    const interval = setInterval(() => {
       this.watch_coinone_order(symbol);
-      clearTimeout(timeout);
-    }, 500);
+      clearTimeout(interval);
+    }, 250);
   }
 
   async upbit_order(symbol: Symbol, qty?: number | undefined): Promise<void> {

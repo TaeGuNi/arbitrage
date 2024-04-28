@@ -158,7 +158,7 @@ export default class Exchange {
         ) {
           coinone_order_price = coinone_ask_price;
           logger.debug(
-            `profit:                ${green}${symbol} ${red}${profit}${reset}`
+            `ask profit:            ${green}${symbol} ${red}${profit}${reset}`
           );
         } else {
           coinone_order_price = coinone_bid_price;
@@ -169,7 +169,7 @@ export default class Exchange {
             upbit_bid_price * bid_qty * (1 - this.upbit_fee) -
             coinone_bid_price * bid_qty * (1 + this.coinone_fee);
           logger.debug(
-            `profit:                ${green}${symbol} ${red}${profit}${reset}`
+            `bid profit:            ${green}${symbol} ${red}${profit}${reset}`
           );
         }
 
